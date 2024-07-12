@@ -19,6 +19,13 @@ lsp.on_attach(function(client, bufnr)
     vim.keymap.set("n", "<leader>rr", function() vim.lsp.buf.references() end, opts)
     vim.keymap.set("n", "<leader>rn", function() vim.lsp.buf.rename() end, opts)
     vim.keymap.set("i", "<C-h>", function() vim.lsp.buf.signature_help() end, opts)
+    local function quickfix()
+        vim.lsp.buf.code_action({
+            filter = function(a) return a.isPreferred end,
+            apply = true
+        })
+    end
+    vim.keymap.set('n', '<leader>qf', quickfix, opts)
     lsp.buffer_autoformat()
 end)
 
