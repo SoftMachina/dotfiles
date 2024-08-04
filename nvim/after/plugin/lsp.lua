@@ -1,9 +1,39 @@
-local lsp = require('lsp-zero')
-require('mason').setup({})
-require('mason-lspconfig').setup({
-  ensure_installed = {'tsserver', 'rust_analyzer', 'zls'},
+local lsp = require('lsp-zero').preset({})
+
+lsp.ensure_installed({
+    'zls',
+    'tsserver',
+    'rust_analyzer',
+    'clangd',
 })
-local lsp_attach = function(client, bufnr)
+
+local cmp = require('cmp')
+local cmp_select = { behavior = cmp.SelectBehavior.Select }
+local cmp_mappings = lsp.defaults.cmp_mappings({
+    ['<C-p>'] = cmp.mapping.select_prev_item(cmp_select),
+    ['<C-n>'] = cmp.mapping.select_next_item(cmp_select),
+    ['<C-y>'] = cmp.mapping.confirm({ select = true }),
+    ["<C-Space>"] = cmp.mapping.complete(),
+})
+
+cmp_mappings['<Tab>'] = nil
+cmp_mappings['<S-Tab>'] = nil
+
+lsp.setup_nvim_cmp({
+    mapping = cmp_mappings
+})
+
+lsp.set_preferences({
+    suggest_lsp_servers = true,
+    sign_icons = {
+        error = 'E',
+        warn = 'W',
+        hint = 'H',
+        info = 'I'
+    }
+})
+
+lsp.on_attach(function(client, bufnr)
     lsp.default_keymaps({ buffer = bufnr })
     local opts = { buffer = bufnr, remap = false }
     vim.keymap.set("n", "gd", function() vim.lsp.buf.definition() end, opts)
@@ -17,7 +47,6 @@ local lsp_attach = function(client, bufnr)
     vim.keymap.set("n", "<leader>gr", function() vim.lsp.buf.references() end, opts)
     vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<cr>', opts)
     vim.keymap.set('n', 'go', '<cmd>lua vim.lsp.buf.type_definition()<cr>', opts)
-    vim.keymap.set({ 'n', 'x' }, '<F3>', '<cmd>lua vim.lsp.buf.format({async = true})<cr>', opts)
     vim.keymap.set("n", "<leader>rn", function() vim.lsp.buf.rename() end, opts)
     vim.keymap.set("i", "<C-h>", function() vim.lsp.buf.signature_help() end, opts)
     local function quickfix()
@@ -28,17 +57,13 @@ local lsp_attach = function(client, bufnr)
     end
     vim.keymap.set('n', '<leader>qf', quickfix, opts)
     lsp.buffer_autoformat()
-end
-
-lsp.extend_lspconfig({
-  capabilities = require('cmp_nvim_lsp').default_capabilities(),
-  lsp_attach = lsp_attach,
-  float_border = 'rounded',
-  sign_text = true,
-})
+end)
 
 -- (Optional) Configure lua language server for neovim
 require('lspconfig').lua_ls.setup(lsp.nvim_lua_ls())
 
-
 lsp.setup()
+
+vim.diagnostic.config({
+    virtual_text = true
+})
