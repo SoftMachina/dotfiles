@@ -30,3 +30,4 @@ vim.opt.updatetime = 50
 
 vim.opt.colorcolumn = "130"
 vim.opt.cursorline = true
+vim.opt.shortmess:append { s = false }
