@@ -2,7 +2,7 @@ local lsp = require('lsp-zero').preset({})
 
 lsp.ensure_installed({
     'zls',
-    'tsserver',
+    'ts_ls',
     'rust_analyzer',
     'clangd',
 })
