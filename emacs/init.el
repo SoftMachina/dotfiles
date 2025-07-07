@@ -1,3 +1,7 @@
+(add-to-list 'custom-theme-load-path "~/.config/emacs/themes/")
+
+(load-theme 'tomorrow-night-paradise t)
+
 (menu-bar-mode -1)
 (tool-bar-mode -1)
 
@@ -70,11 +74,12 @@
   :config
   (setq lsp-ui-doc-enable t
         lsp-ui-doc-delay 0.5
+	lsp-ui-doc-use-childframe t
         lsp-ui-doc-position 'at-point
         lsp-ui-sideline-enable nil
         lsp-ui-sideline-show-diagnostics t
         lsp-ui-sideline-show-hover t))
-(define-key evil-normal-state-map (kbd "K") #'lsp-describe-thing-at-point)
+(define-key evil-normal-state-map (kbd "K") #'lsp-ui-doc-glance)
 
 (use-package flycheck
   :init (global-flycheck-mode))
@@ -113,3 +118,18 @@
          ("\\.vue\\'" . web-mode))
   :config
   (setq web-mode-enable-auto-quoting nil)) ;; optional, prevents unwanted quote insertion
+
+
+(defun my/lsp-apply-first-code-action ()
+  "Apply the first available LSP code action."
+  (interactive)
+  (let ((actions (lsp-code-actions-at-point)))
+    (when actions
+      (lsp--execute-code-action (car actions)))))
+
+(global-set-key (kbd "C-c a") #'my/lsp-apply-first-code-action)
+
+(defun my/lsp-format-buffer-on-save ()
+  (add-hook 'before-save-hook #'lsp-format-buffer nil t))
+
+(add-hook 'lsp-mode-hook #'my/lsp-format-buffer-on-save)
