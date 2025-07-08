@@ -131,6 +131,14 @@
          (compile-command (concat "g++ " (buffer-name) " -o " output-name " && ./" output-name)))
     (compile compile-command)))
 
+
+(defun compile-no-run ()
+  (interactive)
+  (let* ((filename (file-name-base (buffer-name)))
+         (output-name (read-string "Output binary name: " filename))
+         (compile-command (concat "g++ " (buffer-name) " -o " output-name)))
+    (compile compile-command)))
+
 (defun lsp-apply-code-action()
   "Apply the first available LSP code action."
   (interactive)
@@ -143,6 +151,7 @@
 
 ;; Key bindings
 (global-set-key (kbd "C-c r") 'compile-and-run)
+(global-set-key (kbd "C-x c") 'compile-no-run)
 (global-set-key (kbd "C-c a") #'lsp-apply-code-action)
 
 ;; Hooks
