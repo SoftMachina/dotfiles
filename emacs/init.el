@@ -36,6 +36,11 @@
   :config
   (evil-mode 1))
 
+(use-package evil-collection
+  :after evil
+  :config
+  (evil-collection-init))
+
 ;; Projectile
 (use-package projectile
   :ensure t
@@ -69,6 +74,8 @@
           c++-mode
           web-mode
           typescript-mode
+          latex-mode
+          LaTeX-mode
           ) . lsp)
   :commands lsp
   :config
@@ -88,10 +95,55 @@
         lsp-ui-sideline-show-diagnostics t
         lsp-ui-sideline-show-hover t))
 
-;; Key bindings - moved after package definitions
-(with-eval-after-load 'evil
-  (define-key evil-normal-state-map (kbd "K") #'lsp-ui-doc-glance)
-  (define-key evil-normal-state-map (kbd "C-v r") #'lsp-rename))
+;; AUCTeX - Load this first before LSP configuration
+(use-package auctex
+  :ensure t
+  :defer t
+  :hook (LaTeX-mode . turn-on-reftex)
+  :config
+  (setq TeX-auto-save t)
+  (setq TeX-parse-self t)
+  (setq-default TeX-master nil)
+  ;; Enable synctex for forward/inverse search
+  (setq TeX-source-correlate-mode t)
+  (setq TeX-source-correlate-start-server t)
+  ;; Use built-in doc-view for PDF viewing (more stable)
+  (setq TeX-view-program-selection '((output-pdf "Emacs"))
+        TeX-view-program-list '(("Emacs" "%V"))))
+
+;; LaTeX LSP support with texlab - Configure after AUCTeX
+(with-eval-after-load 'lsp-mode
+  (when (executable-find "texlab")
+    (add-to-list 'lsp-language-id-configuration '(latex-mode . "latex"))
+    (add-to-list 'lsp-language-id-configuration '(LaTeX-mode . "latex"))
+    (lsp-register-client
+     (make-lsp-client
+      :new-connection (lsp-stdio-connection "texlab")
+      :major-modes '(latex-mode LaTeX-mode)
+      :server-id 'texlab))))
+
+;; Improve doc-view experience
+(with-eval-after-load 'doc-view
+  (setq doc-view-continuous t)
+  (setq doc-view-resolution 200)  ; Higher resolution for better quality
+  (setq doc-view-scale-internally nil))
+
+;; Auto-revert PDFs when they change
+(add-hook 'doc-view-mode-hook 'auto-revert-mode)
+
+;; Company AUCTeX for LaTeX autocompletion
+(use-package company-auctex
+  :ensure t
+  :after (company auctex)
+  :config
+  (company-auctex-init))
+
+;; RefTeX for references and citations
+(use-package reftex
+  :ensure t
+  :hook (LaTeX-mode . turn-on-reftex)
+  :config
+  (setq reftex-plug-into-AUCTeX t))
 
 ;; FZF
 (use-package fzf
@@ -131,7 +183,6 @@
          (compile-command (concat "g++ " (buffer-name) " -o " output-name " && ./" output-name)))
     (compile compile-command)))
 
-
 (defun compile-no-run ()
   (interactive)
   (let* ((filename (file-name-base (buffer-name)))
@@ -149,10 +200,88 @@
 (defun lsp-format-on-save ()
   (add-hook 'before-save-hook #'lsp-format-buffer nil t))
 
-;; Key bindings
+;; LaTeX functions
+(defun latex-compile ()
+  "Compile the current LaTeX file using pdflatex, asynchronously."
+  (interactive)
+  (let* ((tex-file (buffer-file-name))
+         (output-buffer "*latex-compile*"))
+    (if (and tex-file (string-match "\\.tex\\'" tex-file))
+        (progn
+          (save-buffer)
+          (let ((command "pdflatex")
+                (args (list "-interaction=nonstopmode" tex-file)))
+            (apply 'start-process "latex-compile" output-buffer command args)
+            (display-buffer output-buffer)))
+      (message "Not a .tex file."))))
+
+(defun latex-view ()
+  "View LaTeX PDF using external viewer or fallback."
+  (interactive)
+  (let* ((tex-file (buffer-file-name))
+         (pdf-file (concat (file-name-sans-extension tex-file) ".pdf")))
+    (if (file-exists-p pdf-file)
+        (cond
+         ((eq system-type 'darwin)  ;; macOS
+          (start-process "pdf-viewer" nil "open" pdf-file))
+         ((eq system-type 'gnu/linux)  ;; Linux
+          (start-process "pdf-viewer" nil "xdg-open" pdf-file))
+         (t
+          (message "Unsupported system for PDF viewing.")))
+      (message "PDF file not found."))))
+
+
+;; Window management functions
+(defun evil-window-decrease-height ()
+  (interactive)
+  (shrink-window 10))
+
+(defun evil-window-increase-height ()
+  (interactive)
+  (enlarge-window 10))
+
+(defun evil-window-decrease-width ()
+  (interactive)
+  (shrink-window-horizontally 10))
+
+(defun evil-window-increase-width ()
+  (interactive)
+  (enlarge-window-horizontally 10))
+
+;; Evil quit/save functions
+(defun my/evil-quit-or-save ()
+  "If buffer is modified, ask to save. Then kill the buffer."
+  (interactive)
+  (if (and (buffer-modified-p)
+           (y-or-n-p (format "Buffer %s modified. Save? " (buffer-name))))
+      (save-buffer))
+  (kill-this-buffer))
+
+(defun my/evil-write-quit ()
+  "Save buffer and kill it."
+  (interactive)
+  (save-buffer)
+  (kill-this-buffer))
+
+;; Key bindings - moved after package definitions
+(with-eval-after-load 'evil
+  (define-key evil-normal-state-map (kbd "K") #'lsp-ui-doc-glance)
+  (define-key evil-normal-state-map (kbd "C-v r") #'lsp-rename)
+  ;; Window management key bindings
+  (define-key evil-window-map (kbd "C-h") 'evil-window-decrease-width)
+  (define-key evil-window-map (kbd "C-l") 'evil-window-increase-width)
+  (define-key evil-window-map (kbd "C-j") 'evil-window-decrease-height)
+  (define-key evil-window-map (kbd "C-k") 'evil-window-increase-height)
+  ;; Evil ex commands
+  (evil-ex-define-cmd "q" 'my/evil-quit-or-save)
+  (evil-ex-define-cmd "wq" 'my/evil-write-quit))
+
+;; Global key bindings
 (global-set-key (kbd "C-c r") 'compile-and-run)
 (global-set-key (kbd "C-x c") 'compile-no-run)
 (global-set-key (kbd "C-c a") #'lsp-apply-code-action)
+(global-set-key (kbd "C-c l") 'latex-compile)
+(global-set-key (kbd "C-c t") 'latex-view)
 
 ;; Hooks
 (add-hook 'lsp-mode-hook #'lsp-format-on-save)
@@ -164,7 +293,7 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
-   '(company evil flycheck fzf lsp-mode lsp-ui projectile web-mode)))
+   '(auctex company-auctex reftex evil-collection company evil flycheck fzf lsp-mode lsp-ui projectile web-mode)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
