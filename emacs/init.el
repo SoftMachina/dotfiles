@@ -95,6 +95,17 @@
         lsp-ui-sideline-show-diagnostics t
         lsp-ui-sideline-show-hover t))
 
+(use-package pdf-tools
+  :ensure t
+  :mode ("\\.pdf\\'" . pdf-view-mode)
+  :config
+  (pdf-tools-install)  ;; Compile and enable native PDF support
+  (setq-default pdf-view-display-size 'fit-page)
+  (define-key pdf-view-mode-map (kbd "C-s") 'isearch-forward))
+
+(setq revert-without-query '(".*\\.pdf$"))
+(setq auto-revert-use-notify t)
+
 ;; AUCTeX - Load this first before LSP configuration
 (use-package auctex
   :ensure t
@@ -122,14 +133,6 @@
       :major-modes '(latex-mode LaTeX-mode)
       :server-id 'texlab))))
 
-;; Improve doc-view experience
-(with-eval-after-load 'doc-view
-  (setq doc-view-continuous t)
-  (setq doc-view-resolution 200)  ; Higher resolution for better quality
-  (setq doc-view-scale-internally nil))
-
-;; Auto-revert PDFs when they change
-(add-hook 'doc-view-mode-hook 'auto-revert-mode)
 
 ;; Company AUCTeX for LaTeX autocompletion
 (use-package company-auctex
@@ -200,36 +203,14 @@
 (defun lsp-format-on-save ()
   (add-hook 'before-save-hook #'lsp-format-buffer nil t))
 
-;; LaTeX functions
-(defun latex-compile ()
-  "Compile the current LaTeX file using pdflatex, asynchronously."
-  (interactive)
-  (let* ((tex-file (buffer-file-name))
-         (output-buffer "*latex-compile*"))
-    (if (and tex-file (string-match "\\.tex\\'" tex-file))
-        (progn
-          (save-buffer)
-          (let ((command "pdflatex")
-                (args (list "-interaction=nonstopmode" tex-file)))
-            (apply 'start-process "latex-compile" output-buffer command args)
-            (display-buffer output-buffer)))
-      (message "Not a .tex file."))))
-
 (defun latex-view ()
-  "View LaTeX PDF using external viewer or fallback."
+  "Open the compiled PDF in a new buffer inside Emacs using pdf-tools."
   (interactive)
   (let* ((tex-file (buffer-file-name))
          (pdf-file (concat (file-name-sans-extension tex-file) ".pdf")))
     (if (file-exists-p pdf-file)
-        (cond
-         ((eq system-type 'darwin)  ;; macOS
-          (start-process "pdf-viewer" nil "open" pdf-file))
-         ((eq system-type 'gnu/linux)  ;; Linux
-          (start-process "pdf-viewer" nil "xdg-open" pdf-file))
-         (t
-          (message "Unsupported system for PDF viewing.")))
+        (find-file-other-window pdf-file)
       (message "PDF file not found."))))
-
 
 ;; Window management functions
 (defun evil-window-decrease-height ()
@@ -280,7 +261,6 @@
 (global-set-key (kbd "C-c r") 'compile-and-run)
 (global-set-key (kbd "C-x c") 'compile-no-run)
 (global-set-key (kbd "C-c a") #'lsp-apply-code-action)
-(global-set-key (kbd "C-c l") 'latex-compile)
 (global-set-key (kbd "C-c t") 'latex-view)
 
 ;; Hooks
