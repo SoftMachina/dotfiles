@@ -151,7 +151,7 @@
 ;; FZF
 (use-package fzf
   :ensure t
-  :bind (("C-c f f" . fzf))
+  :bind (("C-c f" . fzf))
   :config
   (setq fzf/args "-x --color bw --print-query --margin=1,0 --no-hscroll"
         fzf/executable "fzf"
@@ -178,19 +178,32 @@
                (window-height . 0.3)))
 
 ;; Custom functions
-(defun compile-and-run ()
+
+(defun compile-make()
+(interactive)
+  (let* ((default-directory (or (project-root (project-current)) default-directory))
+         (makefile-found (or (file-exists-p "Makefile") (file-exists-p "makefile")))
+         (target (read-string "Make target (default: all): ")))
+    (if makefile-found
+        (let ((command (if (string-empty-p target)
+                           "make all"
+                         (concat "make " target))))
+          (compile command))
+      (message "No Makefile found in current directory."))))
+
+(defun compile-build ()
+  (interactive)
+  (let* ((filename (file-name-base (buffer-name)))
+         (output-name (read-string "Output binary name: " filename))
+         (compile-command (concat "g++ " (buffer-name) " -o " output-name)))
+    (compile compile-command)))
+
+(defun compile-run ()
   "Compile and run the current C++ file with a default output name based on the buffer name."
   (interactive)
   (let* ((filename (file-name-base (buffer-name)))
          (output-name (read-string "Output binary name: " filename))
          (compile-command (concat "g++ " (buffer-name) " -o " output-name " && ./" output-name)))
-    (compile compile-command)))
-
-(defun compile-no-run ()
-  (interactive)
-  (let* ((filename (file-name-base (buffer-name)))
-         (output-name (read-string "Output binary name: " filename))
-         (compile-command (concat "g++ " (buffer-name) " -o " output-name)))
     (compile compile-command)))
 
 (defun lsp-apply-code-action()
@@ -211,6 +224,18 @@
     (if (file-exists-p pdf-file)
         (find-file-other-window pdf-file)
       (message "PDF file not found."))))
+
+;; Wrap the selected region in \\ruby{...}{} and place cursor in second {}.
+;; Works with Evil visual mode.
+(defun my/evil-ruby-wrap-visual (beg end)
+  (interactive "r")
+  (when (bound-and-true-p evil-mode)
+    (let ((text (buffer-substring-no-properties beg end)))
+      (delete-region beg end)
+      (insert (format "\\ruby{%s}{}" text))
+      (search-backward "{}")
+      (forward-char 1)
+      (evil-insert-state))))
 
 ;; Window management functions
 (defun evil-window-decrease-height ()
@@ -253,15 +278,20 @@
   (define-key evil-window-map (kbd "C-l") 'evil-window-increase-width)
   (define-key evil-window-map (kbd "C-j") 'evil-window-decrease-height)
   (define-key evil-window-map (kbd "C-k") 'evil-window-increase-height)
+
   ;; Evil ex commands
   (evil-ex-define-cmd "q" 'my/evil-quit-or-save)
   (evil-ex-define-cmd "wq" 'my/evil-write-quit))
 
-;; Global key bindings
-(global-set-key (kbd "C-c r") 'compile-and-run)
-(global-set-key (kbd "C-x c") 'compile-no-run)
+;; Global key bindings TODO: think of better ones!!
+(global-set-key (kbd "C-c b") 'compile-build)
+(global-set-key (kbd "C-c m") 'compile-make)
+(global-set-key (kbd "C-c c r") 'compile-run)
 (global-set-key (kbd "C-c a") #'lsp-apply-code-action)
 (global-set-key (kbd "C-c t") 'latex-view)
+(global-set-key (kbd "C-c e") 'view-echo-area-messages)
+(global-set-key (kbd "C-c k") #'my/evil-ruby-wrap-visual)
+
 
 ;; Hooks
 (add-hook 'lsp-mode-hook #'lsp-format-on-save)
